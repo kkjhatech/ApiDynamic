@@ -1,6 +1,7 @@
 using Dapper;
 using DyApi.Models;
 using Microsoft.IdentityModel.Tokens;
+using System.Data;
 using System.Data.SqlClient;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -24,12 +25,15 @@ public class JwtService : IJwtService
         _logger = logger;
     }
 
+
+
     public LoginResponse GenerateTokens(User user)
     {
-        var accessToken = GenerateAccessToken(user);
+        var now = DateTime.UtcNow.AddHours(5.5);
+        var accessToken = GenerateAccessToken(user, now);
         var refreshToken = GenerateRefreshToken();
 
-        SaveRefreshToken(user.Username, refreshToken);
+        SaveRefreshToken(user.Username, refreshToken, now);
 
         return new LoginResponse
         {
@@ -37,7 +41,7 @@ public class JwtService : IJwtService
             RefreshToken = refreshToken,
             TokenType = "Bearer",
             ExpiresIn = _jwtSettings.AccessTokenExpiryMinutes * 60,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
+            ExpiresAt = now.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes)
         };
     }
 
@@ -65,13 +69,10 @@ public class JwtService : IJwtService
 
     public async Task<bool> RevokeRefreshTokenAsync(string refreshToken)
     {
-        const string sql = @"
-            UPDATE RefreshTokens 
-            SET IsRevoked = 1, RevokedAt = GETUTCDATE() 
-            WHERE Token = @Token";
-
         using var connection = new SqlConnection(_connectionString);
-        var rowsAffected = await connection.ExecuteAsync(sql, new { Token = refreshToken });
+
+        var rowsAffected = await connection.QueryFirstOrDefaultAsync<int>(
+            "usp_RevokeRefreshToken", new { Token = refreshToken }, commandType: CommandType.StoredProcedure);
         
         if (rowsAffected > 0)
         {
@@ -119,7 +120,7 @@ public class JwtService : IJwtService
         return token?.IsActive == true;
     }
 
-    private string GenerateAccessToken(User user)
+    private string GenerateAccessToken(User user, DateTime now)
     {
         var key = Encoding.UTF8.GetBytes(_jwtSettings.SecretKey);
         var credentials = new SigningCredentials(
@@ -139,7 +140,7 @@ public class JwtService : IJwtService
             issuer: _jwtSettings.Issuer,
             audience: _jwtSettings.Audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
+            expires: now.AddMinutes(_jwtSettings.AccessTokenExpiryMinutes),
             signingCredentials: credentials
         );
 
@@ -154,41 +155,29 @@ public class JwtService : IJwtService
         return Convert.ToBase64String(randomBytes);
     }
 
-    private void SaveRefreshToken(string username, string token)
+    private void SaveRefreshToken(string username, string token, DateTime now)
     {
-        const string sql = @"
-            INSERT INTO RefreshTokens (Token, Username, ExpiresAt, CreatedAt, IsRevoked)
-            VALUES (@Token, @Username, @ExpiresAt, @CreatedAt, 0)";
-
         using var connection = new SqlConnection(_connectionString);
-        connection.Execute(sql, new
+        connection.Execute("usp_SaveRefreshToken", new
         {
             Token = token,
             Username = username,
-            ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
-            CreatedAt = DateTime.UtcNow
-        });
+            ExpiresAt = now.AddDays(_jwtSettings.RefreshTokenExpiryDays),
+            CreatedAt = now
+        }, commandType: CommandType.StoredProcedure);
     }
 
     private async Task<RefreshToken?> GetRefreshTokenAsync(string token)
     {
-        const string sql = @"
-            SELECT Id, Token, Username, ExpiresAt, CreatedAt, IsRevoked, RevokedAt
-            FROM RefreshTokens 
-            WHERE Token = @Token";
-
         using var connection = new SqlConnection(_connectionString);
-        return await connection.QueryFirstOrDefaultAsync<RefreshToken>(sql, new { Token = token });
+        return await connection.QueryFirstOrDefaultAsync<RefreshToken>(
+            "usp_GetRefreshToken", new { Token = token }, commandType: CommandType.StoredProcedure);
     }
 
     private async Task<User?> GetUserByUsernameAsync(string username)
     {
-        const string sql = @"
-            SELECT Id, Username, PasswordHash, Email, Role, CreatedAt, IsActive
-            FROM Users 
-            WHERE Username = @Username AND IsActive = 1";
-
         using var connection = new SqlConnection(_connectionString);
-        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
+        return await connection.QueryFirstOrDefaultAsync<User>(
+            "usp_GetUserByUsername", new { Username = username }, commandType: CommandType.StoredProcedure);
     }
 }

@@ -1,5 +1,6 @@
 using Dapper;
 using DyApi.Models;
+using System.Data;
 using System.Data.SqlClient;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -15,7 +16,7 @@ public class EndpointConfigService : IEndpointConfigService
 
     public EndpointConfigService(IConfiguration configuration, IMemoryCache cache, ILogger<EndpointConfigService> logger)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+        _connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection connection string not found.");
         _cache = cache;
         _logger = logger;
@@ -23,17 +24,13 @@ public class EndpointConfigService : IEndpointConfigService
 
     public async Task<IEnumerable<ApiEndpointConfig>> GetAllEndpointsAsync()
     {
-        const string sql = @"
-        SELECT Id, MethodName, HttpVerb, RouteTemplate, StoredProcedureName, 
-               ParameterNames, IsActive, Description, RequiredRole
-        FROM ApiEndpointConfig 
-        WHERE IsActive = 1";
-
         try
         {
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync();
-            return await connection.QueryAsync<ApiEndpointConfig>(sql);
+
+            return await connection.QueryAsync<ApiEndpointConfig>(
+                "usp_GetAllActiveEndpoints", commandType: CommandType.StoredProcedure);
         }
         catch (SqlException ex)
         {

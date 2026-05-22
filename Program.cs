@@ -282,7 +282,7 @@ app.MapGet("/api/health", (IEndpointConfigService configService) =>
     { 
         status = "Healthy", 
         endpointsLoaded = configs.Count,
-        timestamp = DateTime.UtcNow
+        timestamp = DateTime.UtcNow.AddHours(5.5)
     }));
 })
 .WithName("HealthCheck")

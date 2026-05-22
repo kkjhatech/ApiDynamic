@@ -1,8 +1,11 @@
 using Dapper;
 using DyApi.Models;
+using System.Data;
 using System.Data.SqlClient;
 using System.Security.Cryptography;
 using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace DyApi.Services;
 
@@ -14,7 +17,7 @@ public class AuthService : IAuthService
 
     public AuthService(IConfiguration configuration, IJwtService jwtService, ILogger<AuthService> logger)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection") 
+        _connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection not found.");
         _jwtService = jwtService;
         _logger = logger;
@@ -52,21 +55,14 @@ public class AuthService : IAuthService
         }
 
         var passwordHash = HashPassword(password);
-
-        const string sql = @"
-            INSERT INTO Users (Username, PasswordHash, Email, Role, CreatedAt, IsActive)
-            VALUES (@Username, @PasswordHash, @Email, @Role, GETUTCDATE(), 1)";
+        var parameters = new { user.Username, PasswordHash = passwordHash, user.Email, user.Role };
 
         using var connection = new SqlConnection(_connectionString);
-        var rowsAffected = await connection.ExecuteAsync(sql, new
-        {
-            user.Username,
-            PasswordHash = passwordHash,
-            user.Email,
-            user.Role
-        });
 
-        if (rowsAffected > 0)
+        var userId = await connection.QueryFirstOrDefaultAsync<int>(
+            "usp_RegisterUser", parameters, commandType: CommandType.StoredProcedure);
+
+        if (userId > 0)
         {
             _logger.LogInformation("User {Username} registered successfully", user.Username);
             return true;
@@ -77,10 +73,10 @@ public class AuthService : IAuthService
 
     public async Task<bool> ValidateCredentialsAsync(string username, string password)
     {
-        const string sql = "SELECT PasswordHash FROM Users WHERE Username = @Username AND IsActive = 1";
-
         using var connection = new SqlConnection(_connectionString);
-        var passwordHash = await connection.QueryFirstOrDefaultAsync<string>(sql, new { Username = username });
+
+        var passwordHash = await connection.QueryFirstOrDefaultAsync<string>(
+            "usp_ValidateCredentials", new { Username = username }, commandType: CommandType.StoredProcedure);
 
         if (passwordHash == null)
         {
@@ -92,21 +88,18 @@ public class AuthService : IAuthService
 
     private async Task<User?> GetUserByUsernameAsync(string username)
     {
-        const string sql = @"
-            SELECT Id, Username, PasswordHash, Email, Role, CreatedAt, IsActive
-            FROM Users 
-            WHERE Username = @Username AND IsActive = 1";
-
         using var connection = new SqlConnection(_connectionString);
-        return await connection.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
+
+        return await connection.QueryFirstOrDefaultAsync<User>(
+            "usp_GetUserByUsername", new { Username = username }, commandType: CommandType.StoredProcedure);
     }
 
     private async Task<bool> UserExistsAsync(string username)
     {
-        const string sql = "SELECT COUNT(1) FROM Users WHERE Username = @Username";
-        
         using var connection = new SqlConnection(_connectionString);
-        var count = await connection.ExecuteScalarAsync<int>(sql, new { Username = username });
+
+        var count = await connection.QueryFirstOrDefaultAsync<int>(
+            "usp_UserExists", new { Username = username }, commandType: CommandType.StoredProcedure);
         return count > 0;
     }
 

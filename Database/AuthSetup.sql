@@ -11,7 +11,7 @@ BEGIN
         PasswordHash NVARCHAR(500) NOT NULL,
         Email NVARCHAR(200) NOT NULL,
         Role NVARCHAR(50) DEFAULT 'User',
-        CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+        CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
         IsActive BIT DEFAULT 1
     );
     
@@ -28,7 +28,7 @@ BEGIN
         Token NVARCHAR(500) NOT NULL UNIQUE,
         Username NVARCHAR(100) NOT NULL,
         ExpiresAt DATETIME2 NOT NULL,
-        CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+        CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
         IsRevoked BIT DEFAULT 0,
         RevokedAt DATETIME2 NULL,
         CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (Username) REFERENCES Users(Username)
@@ -51,8 +51,8 @@ BEGIN
     SET NOCOUNT ON;
     
     DELETE FROM RefreshTokens 
-    WHERE ExpiresAt < DATEADD(DAY, -30, GETUTCDATE()) 
-       OR (IsRevoked = 1 AND RevokedAt < DATEADD(DAY, -7, GETUTCDATE()));
+    WHERE ExpiresAt < DATEADD(DAY, -30, DATEADD(MINUTE, 330, GETUTCDATE())) 
+       OR (IsRevoked = 1 AND RevokedAt < DATEADD(DAY, -7, DATEADD(MINUTE, 330, GETUTCDATE())));
     
     SELECT @@ROWCOUNT AS DeletedCount;
 END

@@ -65,7 +65,7 @@ CREATE TABLE Users (
     PasswordHash NVARCHAR(500) NOT NULL,
     Email NVARCHAR(200) NOT NULL,
     Role NVARCHAR(50) DEFAULT 'User',
-    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
     IsActive BIT DEFAULT 1
 );
 GO
@@ -79,7 +79,7 @@ CREATE TABLE RefreshTokens (
     Token NVARCHAR(500) NOT NULL UNIQUE,
     Username NVARCHAR(100) NOT NULL,
     ExpiresAt DATETIME2 NOT NULL,
-    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
     IsRevoked BIT DEFAULT 0,
     RevokedAt DATETIME2 NULL,
     CONSTRAINT FK_RefreshTokens_Users FOREIGN KEY (Username) REFERENCES Users(Username)
@@ -105,7 +105,7 @@ CREATE TABLE Customers (
     LastName NVARCHAR(100) NOT NULL,
     Email NVARCHAR(200) NOT NULL,
     Phone NVARCHAR(50),
-    CreatedAt DATETIME2 DEFAULT GETUTCDATE()
+    CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE())
 );
 GO
 
@@ -122,7 +122,7 @@ GO
 CREATE TABLE Orders (
     OrderId INT IDENTITY(1,1) PRIMARY KEY,
     CustomerId INT NOT NULL,
-    OrderDate DATETIME2 DEFAULT GETUTCDATE(),
+    OrderDate DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
     TotalAmount DECIMAL(18,2) NOT NULL,
     Status NVARCHAR(50) DEFAULT 'Pending',
     FOREIGN KEY (CustomerId) REFERENCES Customers(CustomerId)
@@ -145,7 +145,7 @@ CREATE TABLE ApiEndpointConfig (
     RequiredRole NVARCHAR(100) NULL,
     ApplicationID INT NULL,
     APICall NVARCHAR(50) DEFAULT 'Normal', -- Normal, SMS, etc.
-    CreatedAt DATETIME2 DEFAULT GETUTCDATE(),
+    CreatedAt DATETIME2 DEFAULT DATEADD(MINUTE, 330, GETUTCDATE()),
     UpdatedAt DATETIME2 NULL
 );
 GO
@@ -248,7 +248,7 @@ BEGIN
         LastName = COALESCE(@lastName, LastName),
         Email = COALESCE(@email, Email),
         Phone = COALESCE(@phone, Phone),
-        UpdatedAt = GETUTCDATE()
+        UpdatedAt = DATEADD(MINUTE, 330, GETUTCDATE())
     WHERE CustomerId = @customerId;
     
     SELECT 1 AS Success, 'Customer updated successfully' AS Message;

@@ -30,7 +30,7 @@ public class RefreshToken
     public bool IsRevoked { get; set; }
     public DateTime? RevokedAt { get; set; }
 
-    public bool IsActive => !IsRevoked && ExpiresAt > DateTime.UtcNow;
+    public bool IsActive => !IsRevoked && ExpiresAt > DateTime.UtcNow.AddHours(5.5);
 }
 
 public class User
