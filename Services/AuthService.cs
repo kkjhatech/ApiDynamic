@@ -1,4 +1,5 @@
 using Dapper;
+using DyApi.Interfaces;
 using DyApi.Models;
 using System.Data;
 using System.Data.SqlClient;

@@ -1,13 +1,9 @@
 using Dapper;
+using DyApi.Interfaces;
 using System.Data.SqlClient;
 using System.Data;
 
 namespace DyApi.Services;
-
-public interface IDynamicQueryService
-{
-    Task<IEnumerable<dynamic>> ExecuteStoredProcedureAsync(string spName, Dictionary<string, object?> parameters);
-}
 
 public class DynamicQueryService : IDynamicQueryService
 {
